@@ -9,6 +9,7 @@ use {
     secrecy::{ExposeSecret, Secret},
     serde::{Deserialize, Serialize},
     tracing::{debug, warn},
+    url::Url,
 };
 
 use crate::error::Error;
@@ -96,6 +97,12 @@ struct PerplexityMessage {
 }
 
 impl WebSearchTool {
+    async fn ensure_public_outbound_url(&self, url: &str) -> crate::Result<()> {
+        let parsed = Url::parse(url)
+            .map_err(|error| Error::message(format!("invalid outbound URL '{url}': {error}")))?;
+        crate::ssrf::ssrf_check(&parsed, &[]).await
+    }
+
     /// Build from config; returns `None` if disabled or no API key available.
     pub fn from_config(config: &WebSearchConfig) -> Option<Self> {
         Self::from_config_with_env_overrides(config, &HashMap::new())
@@ -316,6 +323,7 @@ impl WebSearchTool {
         if let Some(freshness) = params.get("freshness").and_then(|v| v.as_str()) {
             url.push_str(&format!("&freshness={freshness}"));
         }
+        self.ensure_public_outbound_url(&url).await?;
 
         let client = crate::shared_http_client();
 
@@ -377,9 +385,11 @@ impl WebSearchTool {
                 {"role": "user", "content": query}
             ]
         });
+        let endpoint = format!("{base_url}/chat/completions");
+        self.ensure_public_outbound_url(&endpoint).await?;
 
         let resp = client
-            .post(format!("{base_url}/chat/completions"))
+            .post(endpoint)
             .timeout(self.timeout)
             .header("Authorization", format!("Bearer {api_key}"))
             .json(&body)
@@ -434,6 +444,8 @@ impl WebSearchTool {
                  API key is configured. Set BRAVE_API_KEY or PERPLEXITY_API_KEY to enable search.",
             ));
         }
+        self.ensure_public_outbound_url("https://html.duckduckgo.com/html/")
+            .await?;
 
         let client = crate::shared_http_client();
 
@@ -624,7 +636,7 @@ fn resolve_ddg_redirect(href: &str) -> String {
     };
 
     if full_url.contains("duckduckgo.com/l/")
-        && let Ok(parsed) = url::Url::parse(&full_url)
+        && let Ok(parsed) = Url::parse(&full_url)
     {
         for (key, value) in parsed.query_pairs() {
             if key == "uddg" {
@@ -850,6 +862,16 @@ mod tests {
                 .unwrap()
                 .contains("PERPLEXITY_API_KEY")
         );
+    }
+
+    #[tokio::test]
+    async fn test_ensure_public_outbound_url_blocks_localhost() {
+        let tool = brave_tool();
+        let result = tool
+            .ensure_public_outbound_url("http://127.0.0.1/internal")
+            .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("SSRF blocked"));
     }
 
     #[test]

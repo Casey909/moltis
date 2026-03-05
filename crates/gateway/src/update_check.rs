@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use url::Url;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
 pub struct UpdateAvailability {
     pub available: bool,
@@ -60,6 +62,9 @@ async fn try_fetch_update(
     releases_url: &str,
     current_version: &str,
 ) -> Result<UpdateAvailability, Box<dyn std::error::Error + Send + Sync>> {
+    let parsed_url = Url::parse(releases_url)?;
+    moltis_tools::ssrf::ssrf_check(&parsed_url, &[]).await?;
+
     let response = client.get(releases_url).send().await?;
     if !response.status().is_success() {
         return Err(format!("HTTP {}", response.status()).into());
@@ -181,6 +186,15 @@ mod tests {
         assert!(is_pre_release("v0.11.0-beta.2"));
         assert!(!is_pre_release("0.10.7"));
         assert!(!is_pre_release("v0.10.7"));
+    }
+
+    #[tokio::test]
+    async fn update_check_rejects_localhost_releases_url() {
+        let client = reqwest::Client::new();
+        let result =
+            fetch_update_availability(&client, "http://127.0.0.1/releases.json", "0.10.7").await;
+
+        assert_eq!(result, UpdateAvailability::default());
     }
 
     #[test]
