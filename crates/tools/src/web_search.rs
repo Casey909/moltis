@@ -96,6 +96,8 @@ struct PerplexityMessage {
     content: String,
 }
 
+const DDG_SEARCH_URL: &str = "https://html.duckduckgo.com/html/";
+
 impl WebSearchTool {
     async fn ensure_public_outbound_url(&self, url: &str) -> crate::Result<()> {
         let parsed = Url::parse(url)
@@ -444,13 +446,13 @@ impl WebSearchTool {
                  API key is configured. Set BRAVE_API_KEY or PERPLEXITY_API_KEY to enable search.",
             ));
         }
-        self.ensure_public_outbound_url("https://html.duckduckgo.com/html/")
+        self.ensure_public_outbound_url(DDG_SEARCH_URL)
             .await?;
 
         let client = crate::shared_http_client();
 
         let resp = client
-            .post("https://html.duckduckgo.com/html/")
+            .post(DDG_SEARCH_URL)
             .timeout(self.timeout)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .header("Referer", "https://html.duckduckgo.com/")

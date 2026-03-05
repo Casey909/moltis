@@ -197,6 +197,15 @@ mod tests {
         assert_eq!(result, UpdateAvailability::default());
     }
 
+    #[tokio::test]
+    async fn update_check_rejects_private_network_releases_url() {
+        let client = reqwest::Client::new();
+        let result =
+            fetch_update_availability(&client, "http://10.0.0.1/releases.json", "0.10.7").await;
+
+        assert_eq!(result, UpdateAvailability::default());
+    }
+
     #[test]
     fn selects_channel_based_on_current_version() {
         let stable = ReleaseChannel {
