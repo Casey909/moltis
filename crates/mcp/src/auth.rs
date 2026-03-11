@@ -367,9 +367,9 @@ impl McpOAuthProvider {
                 debug!(url = %meta_url, "using resource_metadata URL from WWW-Authenticate");
                 let meta_url = Url::parse(&meta_url)
                     .context("invalid resource_metadata URL in WWW-Authenticate header")?;
-                fetch_resource_metadata(&self.http_client, &meta_url).await
+                fetch_resource_metadata(&self.http_client, &meta_url, &[]).await
             } else {
-                let result = fetch_resource_metadata(&self.http_client, &server_url).await;
+                let result = fetch_resource_metadata(&self.http_client, &server_url, &[]).await;
                 if result.is_err() && has_path {
                     debug!(
                         server = %self.server_name,
@@ -377,7 +377,7 @@ impl McpOAuthProvider {
                         "resource metadata unavailable at path-aware URL, trying origin"
                     );
                     // Try origin; if that also fails, keep the original error
-                    fetch_resource_metadata(&self.http_client, &origin)
+                    fetch_resource_metadata(&self.http_client, &origin, &[])
                         .await
                         .or(result)
                 } else {
@@ -396,7 +396,7 @@ impl McpOAuthProvider {
                     .context("no authorization_servers in protected resource metadata")?;
                 let as_url = Url::parse(as_url_str)
                     .with_context(|| format!("invalid authorization server URL: {as_url_str}"))?;
-                let as_meta = fetch_as_metadata(&self.http_client, &as_url)
+                let as_meta = fetch_as_metadata(&self.http_client, &as_url, &[])
                     .await
                     .context("failed to fetch authorization server metadata")?;
                 (as_meta, resource)
@@ -409,7 +409,7 @@ impl McpOAuthProvider {
                 );
                 // Fall back: fetch AS metadata. Try the server URL first, then
                 // the origin if the server has a non-trivial path.
-                let as_meta = match fetch_as_metadata(&self.http_client, &server_url).await {
+                let as_meta = match fetch_as_metadata(&self.http_client, &server_url, &[]).await {
                     Ok(meta) => meta,
                     Err(path_err) if has_path => {
                         debug!(
@@ -417,7 +417,7 @@ impl McpOAuthProvider {
                             origin = %origin,
                             "AS metadata unavailable at path-aware URL, trying origin"
                         );
-                        fetch_as_metadata(&self.http_client, &origin).await.with_context(|| {
+                        fetch_as_metadata(&self.http_client, &origin, &[]).await.with_context(|| {
                             format!(
                                 "AS metadata unavailable at both {server_url} and {origin}: {path_err}"
                             )
@@ -463,6 +463,7 @@ impl McpOAuthProvider {
                 reg_endpoint,
                 vec![redirect_uri.to_string()],
                 &format!("moltis ({})", self.server_name),
+                &[],
             )
             .await
             .context("failed to register OAuth client")?;
