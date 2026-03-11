@@ -42,6 +42,8 @@ pub async fn fetch_resource_metadata(
 ) -> Result<ProtectedResourceMetadata> {
     let well_known = build_well_known_url(resource_url, "oauth-protected-resource")?;
 
+    crate::ssrf::ssrf_check(&well_known, &[]).await?;
+
     debug!(url = %well_known, "fetching protected resource metadata");
 
     let resp = client
@@ -104,6 +106,8 @@ pub async fn fetch_as_metadata(
 ) -> Result<AuthorizationServerMetadata> {
     let well_known = build_well_known_url(as_url, "oauth-authorization-server")?;
 
+    crate::ssrf::ssrf_check(&well_known, &[]).await?;
+
     debug!(url = %well_known, "fetching authorization server metadata");
 
     let resp = client
@@ -165,6 +169,11 @@ pub async fn register_client(
     redirect_uris: Vec<String>,
     client_name: &str,
 ) -> Result<ClientRegistrationResponse> {
+    let parsed_url = Url::parse(registration_endpoint).map_err(|source| {
+        Error::external("invalid registration endpoint URL", source)
+    })?;
+    crate::ssrf::ssrf_check(&parsed_url, &[]).await?;
+
     debug!(endpoint = %registration_endpoint, client_name, "registering dynamic OAuth client");
 
     let req = ClientRegistrationRequest {

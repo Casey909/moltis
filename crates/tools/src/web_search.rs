@@ -369,6 +369,12 @@ impl WebSearchTool {
             }));
         }
 
+        let full_url = format!("{base_url}/chat/completions");
+        let parsed = url::Url::parse(&full_url).map_err(|e| {
+            Error::message(format!("invalid Perplexity base URL: {e}"))
+        })?;
+        crate::ssrf::ssrf_check(&parsed, &[]).await?;
+
         let client = crate::shared_http_client();
 
         let body = serde_json::json!({

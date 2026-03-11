@@ -797,6 +797,12 @@ pub struct ServerConfig {
     /// Defaults to 1000. Increase for busy servers, decrease for memory-constrained devices.
     #[serde(default = "default_log_buffer_size")]
     pub log_buffer_size: usize,
+    /// Disable the periodic update checker entirely.
+    ///
+    /// When `true`, the gateway will never contact the releases manifest URL.
+    /// Defaults to `false` (update checks enabled).
+    #[serde(default)]
+    pub disable_update_check: bool,
     /// URL of the releases manifest (`releases.json`) used by the update checker.
     ///
     /// Defaults to `https://www.moltis.org/releases.json` when unset.
@@ -828,6 +834,7 @@ impl Default for ServerConfig {
             http_request_logs: false,
             ws_request_logs: false,
             log_buffer_size: default_log_buffer_size(),
+            disable_update_check: false,
             update_releases_url: None,
             db_pool_max_connections: default_db_pool_max_connections(),
             shiki_cdn_url: None,
