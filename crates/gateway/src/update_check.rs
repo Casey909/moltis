@@ -1,5 +1,9 @@
 use std::time::Duration;
 
+use url::Url;
+
+use moltis_tools::ssrf::ssrf_check;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
 pub struct UpdateAvailability {
     pub available: bool,
@@ -60,6 +64,10 @@ async fn try_fetch_update(
     releases_url: &str,
     current_version: &str,
 ) -> Result<UpdateAvailability, Box<dyn std::error::Error + Send + Sync>> {
+    let parsed = Url::parse(releases_url)?;
+    ssrf_check(&parsed, &[]).await.map_err(|e| {
+        format!("SSRF blocked update check URL {releases_url}: {e}")
+    })?;
     let response = client.get(releases_url).send().await?;
     if !response.status().is_success() {
         return Err(format!("HTTP {}", response.status()).into());

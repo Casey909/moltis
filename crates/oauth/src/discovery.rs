@@ -39,8 +39,11 @@ pub struct ProtectedResourceMetadata {
 pub async fn fetch_resource_metadata(
     client: &Client,
     resource_url: &Url,
+    ssrf_allowlist: &[ipnet::IpNet],
 ) -> Result<ProtectedResourceMetadata> {
     let well_known = build_well_known_url(resource_url, "oauth-protected-resource")?;
+
+    crate::ssrf::ssrf_check(&well_known, ssrf_allowlist).await?;
 
     debug!(url = %well_known, "fetching protected resource metadata");
 
@@ -101,8 +104,11 @@ pub struct AuthorizationServerMetadata {
 pub async fn fetch_as_metadata(
     client: &Client,
     as_url: &Url,
+    ssrf_allowlist: &[ipnet::IpNet],
 ) -> Result<AuthorizationServerMetadata> {
     let well_known = build_well_known_url(as_url, "oauth-authorization-server")?;
+
+    crate::ssrf::ssrf_check(&well_known, ssrf_allowlist).await?;
 
     debug!(url = %well_known, "fetching authorization server metadata");
 
@@ -164,7 +170,13 @@ pub async fn register_client(
     registration_endpoint: &str,
     redirect_uris: Vec<String>,
     client_name: &str,
+    ssrf_allowlist: &[ipnet::IpNet],
 ) -> Result<ClientRegistrationResponse> {
+    let parsed_url = Url::parse(registration_endpoint).map_err(|source| {
+        Error::external("invalid registration endpoint URL", source)
+    })?;
+    crate::ssrf::ssrf_check(&parsed_url, ssrf_allowlist).await?;
+
     debug!(endpoint = %registration_endpoint, client_name, "registering dynamic OAuth client");
 
     let req = ClientRegistrationRequest {
@@ -339,6 +351,11 @@ mod tests {
 
     // ── HTTP integration tests (with mockito) ──────────────────────────
 
+    /// Allowlist for 127.0.0.0/8 so mockito-based tests can connect.
+    fn loopback_allowlist() -> Vec<ipnet::IpNet> {
+        vec!["127.0.0.0/8".parse().unwrap()]
+    }
+
     #[tokio::test]
     async fn fetch_resource_metadata_success() {
         let mut server = mockito::Server::new_async().await;
@@ -358,7 +375,9 @@ mod tests {
 
         let client = Client::new();
         let url = Url::parse(&server.url()).unwrap();
-        let meta = fetch_resource_metadata(&client, &url).await.unwrap();
+        let meta = fetch_resource_metadata(&client, &url, &loopback_allowlist())
+            .await
+            .unwrap();
 
         assert_eq!(meta.resource, server.url());
         assert_eq!(meta.authorization_servers, vec!["https://auth.example.com"]);
@@ -377,7 +396,7 @@ mod tests {
 
         let client = Client::new();
         let url = Url::parse(&server.url()).unwrap();
-        let result = fetch_resource_metadata(&client, &url).await;
+        let result = fetch_resource_metadata(&client, &url, &loopback_allowlist()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("404"));
     }
@@ -404,7 +423,9 @@ mod tests {
 
         let client = Client::new();
         let url = Url::parse(&server.url()).unwrap();
-        let meta = fetch_as_metadata(&client, &url).await.unwrap();
+        let meta = fetch_as_metadata(&client, &url, &loopback_allowlist())
+            .await
+            .unwrap();
 
         assert_eq!(meta.issuer, server.url());
         assert!(meta.authorization_endpoint.ends_with("/authorize"));
@@ -430,7 +451,7 @@ mod tests {
 
         let client = Client::new();
         let url = Url::parse(&server.url()).unwrap();
-        let result = fetch_as_metadata(&client, &url).await;
+        let result = fetch_as_metadata(&client, &url, &loopback_allowlist()).await;
         assert!(result.is_err());
     }
 
@@ -459,6 +480,7 @@ mod tests {
             &format!("{}/register", server.url()),
             vec!["http://127.0.0.1:9999/auth/callback".to_string()],
             "moltis-test",
+            &loopback_allowlist(),
         )
         .await
         .unwrap();
@@ -491,6 +513,7 @@ mod tests {
             &format!("{}/register", server.url()),
             vec!["http://127.0.0.1:9999/auth/callback".to_string()],
             "moltis",
+            &loopback_allowlist(),
         )
         .await
         .unwrap();
@@ -515,6 +538,7 @@ mod tests {
             &format!("{}/register", server.url()),
             vec!["http://127.0.0.1:9999/auth/callback".to_string()],
             "moltis",
+            &loopback_allowlist(),
         )
         .await;
 
@@ -529,7 +553,31 @@ mod tests {
             .build()
             .unwrap();
         let url = Url::parse("http://127.0.0.1:1").unwrap();
-        let result = fetch_resource_metadata(&client, &url).await;
+        let result = fetch_resource_metadata(&client, &url, &loopback_allowlist()).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn ssrf_blocks_private_ip_in_discovery() {
+        let url = Url::parse("http://192.168.1.1/.well-known/test").unwrap();
+        let client = Client::new();
+        let result = fetch_resource_metadata(&client, &url, &[]).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("SSRF"));
+    }
+
+    #[tokio::test]
+    async fn ssrf_blocks_localhost_in_register_client() {
+        let client = Client::new();
+        let result = register_client(
+            &client,
+            "http://127.0.0.1:1234/register",
+            vec!["http://localhost/callback".to_string()],
+            "test",
+            &[],
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("SSRF"));
     }
 }

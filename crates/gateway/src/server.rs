@@ -4454,9 +4454,12 @@ pub async fn prepare_gateway(
     }
 
     // Spawn periodic update check against releases manifest.
-    let update_state = Arc::clone(&state);
-    let releases_url = resolve_releases_url(config.server.update_releases_url.as_deref());
-    tokio::spawn(async move {
+    if config.server.disable_update_check {
+        info!("update checker disabled via config");
+    } else {
+        let update_state = Arc::clone(&state);
+        let releases_url = resolve_releases_url(config.server.update_releases_url.as_deref());
+        tokio::spawn(async move {
         let client = match reqwest::Client::builder()
             .user_agent(format!("moltis-gateway/{}", update_state.version))
             .timeout(std::time::Duration::from_secs(12))
@@ -4493,6 +4496,7 @@ pub async fn prepare_gateway(
             }
         }
     });
+    }
 
     // Spawn metrics history collection and broadcast task (every 30 seconds).
     #[cfg(feature = "metrics")]

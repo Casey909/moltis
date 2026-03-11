@@ -9,6 +9,7 @@ pub mod flow;
 pub mod kimi;
 pub mod pkce;
 pub mod registration_store;
+pub mod ssrf;
 pub mod storage;
 pub mod types;
 
