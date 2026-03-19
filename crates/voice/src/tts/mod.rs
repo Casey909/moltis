@@ -3,12 +3,14 @@
 mod coqui;
 mod elevenlabs;
 mod google;
+mod lm_studio;
+mod macos;
 mod openai;
 mod piper;
 
 pub use {
-    coqui::CoquiTts, elevenlabs::ElevenLabsTts, google::GoogleTts, openai::OpenAiTts,
-    piper::PiperTts,
+    coqui::CoquiTts, elevenlabs::ElevenLabsTts, google::GoogleTts, lm_studio::LmStudioTts,
+    macos::MacOsTts, openai::OpenAiTts, piper::PiperTts,
 };
 
 use {

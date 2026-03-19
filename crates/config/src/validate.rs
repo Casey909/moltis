@@ -576,6 +576,14 @@ fn build_schema_map() -> KnownKeys {
                                 ("endpoint", Leaf),
                             ])),
                         ),
+                        (
+                            "lm_studio",
+                            Struct(HashMap::from([
+                                ("endpoint", Leaf),
+                                ("voice", Leaf),
+                                ("model", Leaf),
+                            ])),
+                        ),
                     ])),
                 ),
                 (
@@ -651,6 +659,14 @@ fn build_schema_map() -> KnownKeys {
                                 ("model_dir", Leaf),
                                 ("language", Leaf),
                                 ("sample_rate", Leaf),
+                            ])),
+                        ),
+                        (
+                            "lm_studio",
+                            Struct(HashMap::from([
+                                ("endpoint", Leaf),
+                                ("model", Leaf),
+                                ("language", Leaf),
                             ])),
                         ),
                     ])),
@@ -1305,6 +1321,9 @@ fn check_semantic_warnings(config: &MoltisConfig, diagnostics: &mut Vec<Diagnost
         "google-tts",
         "piper",
         "coqui",
+        "lm-studio",
+        "lmstudio",
+        "macos",
     ];
     for (idx, provider) in config.voice.tts.providers.iter().enumerate() {
         if !valid_voice_tts_providers.contains(&provider.as_str()) {
@@ -1332,6 +1351,9 @@ fn check_semantic_warnings(config: &MoltisConfig, diagnostics: &mut Vec<Diagnost
         "voxtral-local",
         "whisper-cli",
         "sherpa-onnx",
+        "lm-studio",
+        "lm-studio-stt",
+        "lmstudio",
     ];
     for (idx, provider) in config.voice.stt.providers.iter().enumerate() {
         if !valid_voice_stt_providers.contains(&provider.as_str()) {
