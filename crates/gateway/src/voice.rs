@@ -20,9 +20,9 @@ use {
 #[cfg(feature = "voice")]
 use moltis_voice::{
     AudioFormat, CoquiTts, DeepgramStt, ElevenLabsStt, ElevenLabsTts, GoogleStt, GoogleTts,
-    GroqStt, MistralStt, OpenAiTts, PiperTts, SherpaOnnxStt, SttProvider, SttProviderId,
-    SynthesizeRequest, TranscribeRequest, TtsConfig, TtsProvider, TtsProviderId, VoxtralLocalStt,
-    WhisperCliStt, WhisperStt, strip_ssml_tags,
+    GroqStt, LmStudioStt, LmStudioTts, MacOsTts, MistralStt, OpenAiTts, PiperTts, SherpaOnnxStt,
+    SttProvider, SttProviderId, SynthesizeRequest, TranscribeRequest, TtsConfig, TtsProvider,
+    TtsProviderId, VoxtralLocalStt, WhisperCliStt, WhisperStt, strip_ssml_tags,
 };
 
 #[cfg(feature = "voice")]
@@ -46,6 +46,7 @@ impl IntoVoiceSttProvider for SttProviderId {
             SttProviderId::WhisperCli => moltis_config::VoiceSttProvider::WhisperCli,
             SttProviderId::SherpaOnnx => moltis_config::VoiceSttProvider::SherpaOnnx,
             SttProviderId::ElevenLabs => moltis_config::VoiceSttProvider::ElevenLabs,
+            SttProviderId::LmStudio => moltis_config::VoiceSttProvider::LmStudio,
         }
     }
 }
@@ -136,6 +137,11 @@ impl LiveTtsService {
                 speaker: None,
                 language: None,
             },
+            lm_studio: moltis_voice::LmStudioTtsConfig {
+                endpoint: cfg.voice.tts.lm_studio.endpoint.clone(),
+                voice: cfg.voice.tts.lm_studio.voice.clone(),
+                model: cfg.voice.tts.lm_studio.model.clone(),
+            },
         }
     }
 
@@ -176,6 +182,22 @@ impl LiveTtsService {
                     None
                 }
             },
+            TtsProviderId::LmStudio => {
+                let lm_studio = LmStudioTts::with_defaults(
+                    Some(config.lm_studio.endpoint.clone()),
+                    config.lm_studio.voice.clone(),
+                    config.lm_studio.model.clone(),
+                );
+                Some(Box::new(lm_studio) as Box<dyn TtsProvider + Send + Sync>)
+            },
+            TtsProviderId::MacOs => {
+                let macos = MacOsTts::new();
+                if macos.is_configured() {
+                    Some(Box::new(macos) as Box<dyn TtsProvider + Send + Sync>)
+                } else {
+                    None
+                }
+            },
         }
     }
 
@@ -191,6 +213,8 @@ impl LiveTtsService {
             (TtsProviderId::Google, config.google.api_key.is_some()),
             (TtsProviderId::Piper, config.piper.model_path.is_some()),
             (TtsProviderId::Coqui, true), // Always available if server running
+            (TtsProviderId::LmStudio, true), // Always available (local)
+            (TtsProviderId::MacOs, cfg!(target_os = "macos")),
         ]
     }
 
@@ -594,6 +618,14 @@ impl LiveSttService {
                     cfg.voice.stt.elevenlabs.language.clone(),
                 )) as Box<dyn SttProvider + Send + Sync>
             }),
+            SttProviderId::LmStudio => {
+                let provider = LmStudioStt::with_options(
+                    Some(cfg.voice.stt.lm_studio.endpoint.clone()),
+                    cfg.voice.stt.lm_studio.model.clone(),
+                    cfg.voice.stt.lm_studio.language.clone(),
+                );
+                Some(Box::new(provider) as Box<dyn SttProvider + Send + Sync>)
+            },
         }
     }
 
@@ -631,6 +663,7 @@ impl LiveSttService {
                 SttProviderId::ElevenLabs,
                 cfg.voice.stt.elevenlabs.api_key.is_some(),
             ),
+            (SttProviderId::LmStudio, true), // Always available (local)
         ]
     }
 

@@ -1437,6 +1437,10 @@ fn apply_runtime_tool_filters(
 pub struct DisabledModelsStore {
     #[serde(default)]
     pub disabled: HashSet<String>,
+    /// Models the user has explicitly enabled. New models not in this set are
+    /// automatically disabled on discovery.
+    #[serde(default)]
+    pub enabled: HashSet<String>,
     #[serde(default)]
     pub unsupported: HashMap<String, UnsupportedModelInfo>,
 }
@@ -1472,11 +1476,13 @@ impl DisabledModelsStore {
 
     /// Disable a model by ID.
     pub fn disable(&mut self, model_id: &str) -> bool {
+        self.enabled.remove(model_id);
         self.disabled.insert(model_id.to_string())
     }
 
     /// Enable a model by ID (remove from disabled set).
     pub fn enable(&mut self, model_id: &str) -> bool {
+        self.enabled.insert(model_id.to_string());
         self.disabled.remove(model_id)
     }
 
@@ -1519,6 +1525,21 @@ impl DisabledModelsStore {
     /// Get unsupported metadata for a model.
     pub fn unsupported_info(&self, model_id: &str) -> Option<&UnsupportedModelInfo> {
         self.unsupported.get(model_id)
+    }
+
+    /// Automatically disable newly discovered models that the user has not
+    /// explicitly enabled. Returns the number of newly disabled models.
+    pub fn auto_disable_new_models(&mut self, all_model_ids: &[String]) -> usize {
+        let mut count = 0;
+        for model_id in all_model_ids {
+            // Skip models the user already knows about (explicitly enabled or disabled).
+            if self.enabled.contains(model_id) || self.disabled.contains(model_id) {
+                continue;
+            }
+            self.disabled.insert(model_id.clone());
+            count += 1;
+        }
+        count
     }
 }
 
@@ -1799,9 +1820,26 @@ impl ModelService for LiveModelService {
 
     async fn list_all(&self) -> ServiceResult {
         let reg = self.providers.read().await;
-        let disabled = self.disabled.read().await;
         let order = self.priority_order().await;
         let all_models = reg.list_models_with_reasoning_variants();
+
+        // Auto-disable newly discovered models that the user hasn't explicitly
+        // enabled or disabled yet. This ensures users opt-in to each model.
+        {
+            let all_ids: Vec<String> = all_models
+                .iter()
+                .filter(|m| moltis_providers::is_chat_capable_model(&m.id))
+                .map(|m| m.id.clone())
+                .collect();
+            let mut disabled = self.disabled.write().await;
+            let count = disabled.auto_disable_new_models(&all_ids);
+            if count > 0 {
+                info!(count, "auto-disabled newly discovered models");
+                let _ = disabled.save();
+            }
+        }
+
+        let disabled = self.disabled.read().await;
         let prioritized = Self::prioritize_models(
             &order,
             all_models

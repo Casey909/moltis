@@ -527,7 +527,7 @@ enabled = true                    # Enable text-to-speech
 # provider = "openai"             # Active TTS provider (auto-selects first configured if omitted)
 providers = ["openai", "elevenlabs"] # UI allowlist (empty = show all TTS providers)
 # All available TTS providers:
-#   "openai", "elevenlabs", "google", "piper", "coqui"
+#   "openai", "elevenlabs", "google", "piper", "coqui", "lm-studio", "macos"
 
 [voice.stt]
 enabled = true                    # Enable speech-to-text
@@ -535,12 +535,18 @@ enabled = true                    # Enable speech-to-text
 providers = ["whisper", "mistral", "elevenlabs"] # UI allowlist (empty = show all STT providers)
 # All available STT providers:
 #   "whisper", "groq", "deepgram", "google", "mistral",
-#   "voxtral-local", "whisper-cli", "sherpa-onnx", "elevenlabs-stt"
+#   "voxtral-local", "whisper-cli", "sherpa-onnx", "elevenlabs-stt", "lm-studio-stt"
 
 # No api_key needed for OpenAI TTS/Whisper when OpenAI is configured as an LLM provider.
 # [voice.tts.openai]
 # voice = "alloy"                 # alloy, echo, fable, onyx, nova, shimmer
 # model = "tts-1"                 # tts-1 or tts-1-hd
+
+# LM Studio (local) settings - no API key needed
+# [voice.tts.lm_studio]
+# endpoint = "http://localhost:1234/v1"
+# [voice.stt.lm_studio]
+# endpoint = "http://localhost:1234/v1"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAILSCALE

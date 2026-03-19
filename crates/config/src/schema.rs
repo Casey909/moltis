@@ -376,7 +376,7 @@ pub struct VoiceConfig {
 pub struct VoiceTtsConfig {
     /// Enable TTS globally.
     pub enabled: bool,
-    /// Active provider: "openai", "elevenlabs", "google", "piper", "coqui".
+    /// Active provider: "openai", "elevenlabs", "google", "piper", "coqui", "lm-studio", "macos".
     /// Empty string means auto-select the first configured provider.
     pub provider: String,
     /// Provider IDs to list in the UI. Empty means list all.
@@ -391,6 +391,8 @@ pub struct VoiceTtsConfig {
     pub piper: VoicePiperTtsConfig,
     /// Coqui TTS (local server) settings.
     pub coqui: VoiceCoquiTtsConfig,
+    /// LM Studio TTS (local) settings.
+    pub lm_studio: VoiceLmStudioTtsConfig,
 }
 
 impl Default for VoiceTtsConfig {
@@ -404,6 +406,7 @@ impl Default for VoiceTtsConfig {
             google: VoiceGoogleTtsConfig::default(),
             piper: VoicePiperTtsConfig::default(),
             coqui: VoiceCoquiTtsConfig::default(),
+            lm_studio: VoiceLmStudioTtsConfig::default(),
         }
     }
 }
@@ -507,6 +510,50 @@ impl Default for VoiceCoquiTtsConfig {
     }
 }
 
+/// LM Studio TTS (local) configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct VoiceLmStudioTtsConfig {
+    /// LM Studio server endpoint (default: http://localhost:1234/v1).
+    pub endpoint: String,
+    /// Voice to use (optional, server default if not set).
+    pub voice: Option<String>,
+    /// Model to use (optional, uses loaded model if not set).
+    pub model: Option<String>,
+}
+
+impl Default for VoiceLmStudioTtsConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: "http://localhost:1234/v1".into(),
+            voice: None,
+            model: None,
+        }
+    }
+}
+
+/// LM Studio STT (local) configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct VoiceLmStudioSttConfig {
+    /// LM Studio server endpoint (default: http://localhost:1234/v1).
+    pub endpoint: String,
+    /// Model to use (optional, uses loaded model if not set).
+    pub model: Option<String>,
+    /// Language hint (ISO 639-1 code).
+    pub language: Option<String>,
+}
+
+impl Default for VoiceLmStudioSttConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: "http://localhost:1234/v1".into(),
+            model: None,
+            language: None,
+        }
+    }
+}
+
 /// Voice STT configuration for moltis.toml.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -535,6 +582,8 @@ pub struct VoiceSttConfig {
     pub whisper_cli: VoiceWhisperCliConfig,
     /// sherpa-onnx offline settings.
     pub sherpa_onnx: VoiceSherpaOnnxConfig,
+    /// LM Studio STT (local) settings.
+    pub lm_studio: VoiceLmStudioSttConfig,
 }
 
 impl Default for VoiceSttConfig {
@@ -552,6 +601,7 @@ impl Default for VoiceSttConfig {
             voxtral_local: VoiceVoxtralLocalConfig::default(),
             whisper_cli: VoiceWhisperCliConfig::default(),
             sherpa_onnx: VoiceSherpaOnnxConfig::default(),
+            lm_studio: VoiceLmStudioSttConfig::default(),
         }
     }
 }
@@ -577,6 +627,8 @@ pub enum VoiceSttProvider {
     WhisperCli,
     #[serde(rename = "sherpa-onnx")]
     SherpaOnnx,
+    #[serde(rename = "lm-studio-stt", alias = "lm-studio")]
+    LmStudio,
 }
 
 impl VoiceSttProvider {
@@ -592,6 +644,7 @@ impl VoiceSttProvider {
             Self::VoxtralLocal => "voxtral-local",
             Self::WhisperCli => "whisper-cli",
             Self::SherpaOnnx => "sherpa-onnx",
+            Self::LmStudio => "lm-studio-stt",
         }
     }
 
@@ -607,6 +660,7 @@ impl VoiceSttProvider {
             "voxtral-local" => Some(Self::VoxtralLocal),
             "whisper-cli" => Some(Self::WhisperCli),
             "sherpa-onnx" => Some(Self::SherpaOnnx),
+            "lm-studio" | "lm-studio-stt" | "lmstudio" => Some(Self::LmStudio),
             _ => None,
         }
     }

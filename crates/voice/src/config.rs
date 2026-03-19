@@ -22,6 +22,10 @@ pub enum TtsProviderId {
     Piper,
     #[serde(rename = "coqui")]
     Coqui,
+    #[serde(rename = "lm-studio")]
+    LmStudio,
+    #[serde(rename = "macos")]
+    MacOs,
 }
 
 impl fmt::Display for TtsProviderId {
@@ -32,6 +36,8 @@ impl fmt::Display for TtsProviderId {
             Self::Google => write!(f, "google"),
             Self::Piper => write!(f, "piper"),
             Self::Coqui => write!(f, "coqui"),
+            Self::LmStudio => write!(f, "lm-studio"),
+            Self::MacOs => write!(f, "macos"),
         }
     }
 }
@@ -45,6 +51,8 @@ impl TtsProviderId {
             "google" | "google-tts" => Some(Self::Google),
             "piper" => Some(Self::Piper),
             "coqui" => Some(Self::Coqui),
+            "lm-studio" | "lmstudio" => Some(Self::LmStudio),
+            "macos" => Some(Self::MacOs),
             _ => None,
         }
     }
@@ -57,6 +65,8 @@ impl TtsProviderId {
             Self::Google => "Google Cloud TTS",
             Self::Piper => "Piper",
             Self::Coqui => "Coqui TTS",
+            Self::LmStudio => "LM Studio",
+            Self::MacOs => "macOS",
         }
     }
 
@@ -68,6 +78,8 @@ impl TtsProviderId {
             Self::Google,
             Self::Piper,
             Self::Coqui,
+            Self::LmStudio,
+            Self::MacOs,
         ]
     }
 }
@@ -94,6 +106,8 @@ pub enum SttProviderId {
     SherpaOnnx,
     #[serde(rename = "elevenlabs-stt", alias = "elevenlabs")]
     ElevenLabs,
+    #[serde(rename = "lm-studio-stt", alias = "lm-studio")]
+    LmStudio,
 }
 
 impl fmt::Display for SttProviderId {
@@ -108,6 +122,7 @@ impl fmt::Display for SttProviderId {
             Self::WhisperCli => write!(f, "whisper-cli"),
             Self::SherpaOnnx => write!(f, "sherpa-onnx"),
             Self::ElevenLabs => write!(f, "elevenlabs-stt"),
+            Self::LmStudio => write!(f, "lm-studio-stt"),
         }
     }
 }
@@ -125,6 +140,7 @@ impl SttProviderId {
             "whisper-cli" => Some(Self::WhisperCli),
             "sherpa-onnx" => Some(Self::SherpaOnnx),
             "elevenlabs" | "elevenlabs-stt" => Some(Self::ElevenLabs),
+            "lm-studio" | "lm-studio-stt" | "lmstudio" => Some(Self::LmStudio),
             _ => None,
         }
     }
@@ -141,6 +157,7 @@ impl SttProviderId {
             Self::WhisperCli => "whisper.cpp",
             Self::SherpaOnnx => "sherpa-onnx",
             Self::ElevenLabs => "ElevenLabs Scribe",
+            Self::LmStudio => "LM Studio",
         }
     }
 
@@ -156,6 +173,7 @@ impl SttProviderId {
             Self::WhisperCli,
             Self::SherpaOnnx,
             Self::ElevenLabs,
+            Self::LmStudio,
         ]
     }
 }
@@ -177,7 +195,7 @@ pub struct TtsConfig {
     /// Enable TTS globally.
     pub enabled: bool,
 
-    /// Default provider: "elevenlabs", "openai", "google", "piper", "coqui".
+    /// Default provider: "elevenlabs", "openai", "google", "piper", "coqui", "lm-studio", "macos".
     pub provider: String,
 
     /// Auto-speak mode.
@@ -200,6 +218,9 @@ pub struct TtsConfig {
 
     /// Coqui TTS (local) settings.
     pub coqui: CoquiTtsConfig,
+
+    /// LM Studio TTS (local) settings.
+    pub lm_studio: LmStudioTtsConfig,
 }
 
 impl Default for TtsConfig {
@@ -214,6 +235,7 @@ impl Default for TtsConfig {
             google: GoogleTtsConfig::default(),
             piper: PiperTtsConfig::default(),
             coqui: CoquiTtsConfig::default(),
+            lm_studio: LmStudioTtsConfig::default(),
         }
     }
 }
@@ -383,7 +405,7 @@ pub struct SttConfig {
     /// Enable STT globally.
     pub enabled: bool,
 
-    /// Default provider: "whisper", "groq", "deepgram", "google", "mistral", "voxtral-local", "whisper-cli", "sherpa-onnx", "elevenlabs".
+    /// Default provider: "whisper", "groq", "deepgram", "google", "mistral", "voxtral-local", "whisper-cli", "sherpa-onnx", "elevenlabs", "lm-studio-stt".
     pub provider: String,
 
     /// OpenAI Whisper settings.
@@ -412,6 +434,9 @@ pub struct SttConfig {
 
     /// ElevenLabs Scribe settings.
     pub elevenlabs: ElevenLabsSttConfig,
+
+    /// LM Studio STT (local) settings.
+    pub lm_studio: LmStudioSttConfig,
 }
 
 impl Default for SttConfig {
@@ -428,6 +453,7 @@ impl Default for SttConfig {
             whisper_cli: WhisperCliConfig::default(),
             sherpa_onnx: SherpaOnnxConfig::default(),
             elevenlabs: ElevenLabsSttConfig::default(),
+            lm_studio: LmStudioSttConfig::default(),
         }
     }
 }
@@ -590,6 +616,54 @@ impl Default for VoxtralLocalConfig {
     }
 }
 
+/// LM Studio TTS (local) configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LmStudioTtsConfig {
+    /// LM Studio server endpoint (default: http://localhost:1234/v1).
+    pub endpoint: String,
+
+    /// Voice to use (optional, server default if not set).
+    pub voice: Option<String>,
+
+    /// Model to use (optional, uses loaded model if not set).
+    pub model: Option<String>,
+}
+
+impl Default for LmStudioTtsConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: "http://localhost:1234/v1".into(),
+            voice: None,
+            model: None,
+        }
+    }
+}
+
+/// LM Studio STT (local) configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LmStudioSttConfig {
+    /// LM Studio server endpoint (default: http://localhost:1234/v1).
+    pub endpoint: String,
+
+    /// Model to use (optional, uses loaded model if not set).
+    pub model: Option<String>,
+
+    /// Language hint (ISO 639-1 code).
+    pub language: Option<String>,
+}
+
+impl Default for LmStudioSttConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: "http://localhost:1234/v1".into(),
+            model: None,
+            language: None,
+        }
+    }
+}
+
 // ── Secret serialization helpers ───────────────────────────────────────────
 
 fn serialize_option_secret<S>(
@@ -674,6 +748,7 @@ mod tests {
                 google: GoogleTtsConfig::default(),
                 piper: PiperTtsConfig::default(),
                 coqui: CoquiTtsConfig::default(),
+                lm_studio: LmStudioTtsConfig::default(),
             },
             stt: SttConfig::default(),
         };
