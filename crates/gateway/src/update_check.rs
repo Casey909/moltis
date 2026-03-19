@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use {moltis_tools::ssrf::ssrf_check, url::Url};
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
 pub struct UpdateAvailability {
     pub available: bool,
@@ -60,6 +62,10 @@ async fn try_fetch_update(
     releases_url: &str,
     current_version: &str,
 ) -> Result<UpdateAvailability, Box<dyn std::error::Error + Send + Sync>> {
+    // SSRF protection: validate URL before fetching
+    let url = Url::parse(releases_url)?;
+    ssrf_check(&url, &[]).await?;
+
     let response = client.get(releases_url).send().await?;
     if !response.status().is_success() {
         return Err(format!("HTTP {}", response.status()).into());
